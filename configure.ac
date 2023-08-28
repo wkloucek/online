@@ -1077,6 +1077,9 @@ if test "$HAVE_CXXSTD" = TRUE -a "$ENABLE_ANDROIDAPP" != "true" ; then
     LIBS=$save_LIBS
 fi
 
+# TODO
+CXXFLAGS="$CXXFLAGS -mavx2"
+
 if test -n "$STD_FILESYSTEM" ; then
     LIBS="$LIBS -lstdc++fs"
     AC_DEFINE([HAVE_STD_FILESYSTEM],1,[Whether the used C++ has support for std::filesystem.])

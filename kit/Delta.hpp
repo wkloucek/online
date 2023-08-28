@@ -17,6 +17,7 @@
 #include <Common.hpp>
 #include <FileUtil.hpp>
 #include <Png.hpp>
+#include <immintrin.h>
 
 #ifndef TILE_WIRE_ID
 #  define TILE_WIRE_ID
@@ -141,6 +142,15 @@ class DeltaGenerator {
             return sizeof(DeltaBitmapRow) + _rleSize * 4;
         }
 
+#if 1
+        inline uint64_t diffMask(__m256i prev, __m256i curr)
+        {
+            __m256i res = _mm256_cmpeq_epi32(prev, curr);
+            __m256 m256 = _mm256_castsi256_ps(res);
+            return _mm256_movemask_ps(m256);
+        }
+#endif
+
         void initRow(const uint32_t *from, unsigned int width)
         {
             uint32_t scratch[width];
@@ -181,6 +191,44 @@ class DeltaGenerator {
                 }
                 _rleMask[nMask] = rleMask;
             }
+
+#if 1
+            x = 0;
+            const uint32_t* block = from;
+            for (unsigned int nMask = 0; nMask < 4; ++nMask)
+            {
+                uint64_t rleMask = 0;
+                int remaining = width - x;
+                assert(remaining % 8 == 0);
+                int blocks = std::min(remaining / 8, 8);
+                for (int i = 0; i < blocks; ++i)
+                {
+                    switch (x)
+                    {
+                        case 0:
+                        {
+                            __m256i prev = _mm256_setr_epi32(0 /*transparent*/, block[0], block[1], block[2],
+                                                             block[3], block[4], block[5], block[6]);
+                            __m256i curr = _mm256_loadu_si256(reinterpret_cast<const __m256i_u*>(block));
+                            rleMask |= diffMask(prev, curr) << (i * 8);
+                            break;
+                        }
+                        default:
+                        {
+                            __m256i prev = _mm256_loadu_si256(reinterpret_cast<const __m256i_u*>(block - 1));
+                            __m256i curr = _mm256_loadu_si256(reinterpret_cast<const __m256i_u*>(block));
+                            rleMask |= diffMask(prev, curr) << (i * 8);
+                            break;
+                        }
+                    }
+                    block += 8;
+                    x += 8;
+                }
+                assert(_rleMask[nMask] == rleMask);
+                _rleMask[nMask] = rleMask;
+            }
+#endif
+
             if (x < width)
             {
                 memcpy(scratch + outp, from + x, (width - x) * 4);
