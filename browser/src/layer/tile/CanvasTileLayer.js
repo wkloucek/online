@@ -5816,9 +5816,6 @@ L.CanvasTileLayer = L.Layer.extend({
 
 	_viewReset: function (e) {
 		this._reset(this._map.getCenter(), this._map.getZoom(), e && e.hard);
-		if (this._docType === 'spreadsheet' && this._annotations !== 'undefined') {
-			app.socket.sendMessage('commandvalues command=.uno:ViewAnnotationsPosition');
-		}
 	},
 
 	_removeSplitters: function () {
