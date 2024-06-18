@@ -256,8 +256,6 @@ static bool haveCorrectCapabilities()
     bool result = true;
 
     // Do check them all, don't shortcut with &&
-    if (!haveCapability(CAP_SYS_CHROOT))
-        result = false;
     if (!haveCapability(CAP_FOWNER))
         result = false;
     if (!haveCapability(CAP_CHOWN))
