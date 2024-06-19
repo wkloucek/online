@@ -16,6 +16,8 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/mount.h>
+#include <sysexits.h>
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef __linux__
@@ -30,19 +32,157 @@
 #include "Log.hpp"
 #include <SigUtil.hpp>
 
+#define MOUNT mount
+
 namespace JailUtil
 {
 
 static const std::string CoolTestMountpoint = "cool_test_mount";
 
+bool domount(const std::string& arg, std::string source, std::string target)
+{
+    const char* program = "placeholder";
+
+    if (arg == "-u") // Unmount
+    {
+        struct stat sb;
+        const bool target_exists = (stat(target.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode));
+
+        // Do nothing if target doesn't exist.
+        if (target_exists)
+        {
+            // Unmount the target, first by detaching. This should succeed.
+            int retval = umount2(target.c_str(), MNT_DETACH);
+            if (retval != 0)
+            {
+                if (errno != EINVAL)
+                {
+                    // Don't complain where MNT_DETACH is unsupported. Fall back to forcing instead.
+                    fprintf(stderr, "%s: unmount failed to detach [%s]: %s.\n", program, target.c_str(),
+                            strerror(errno));
+                }
+
+                // Now try to force the unmounting, which isn't supported on all filesystems.
+                retval = umount2(target.c_str(), MNT_FORCE);
+                if (retval != 0)
+                {
+                    // From man umount(2), MNT_FORCE is not commonly supported:
+                    // As at Linux 4.12, MNT_FORCE is supported only on the following filesystems: 9p (since
+                    // Linux 2.6.16), ceph (since Linux 2.6.34), cifs (since Linux 2.6.12),
+                    // fuse (since Linux 2.6.16), lustre (since Linux 3.11), and NFS (since Linux 2.1.116).
+                    if (errno != EINVAL)
+                    {
+                        // Complain to capture the reason of failure.
+                        fprintf(stderr, "%s: forced unmount of [%s] failed: %s.\n", program, target.c_str(),
+                                strerror(errno));
+                    }
+
+                    return EX_SOFTWARE;
+                }
+            }
+        }
+    }
+    else // Mount
+    {
+        struct stat sb;
+        if (stat(source.c_str(), &sb))
+        {
+            fprintf(stderr, "%s: cannot mount from invalid source [%s]. stat failed with %s\n",
+                    program, source.c_str(), strerror(errno));
+            return EX_USAGE;
+        }
+
+        const bool isDir = S_ISDIR(sb.st_mode);
+        const bool isCharDev = S_ISCHR(sb.st_mode); // We don't support regular files.
+        if (isCharDev)
+        {
+            // Even for character devices, we only support the random devices.
+            if (strstr("/dev/random", source.c_str()) && strstr("/dev/urandom", source.c_str()))
+            {
+                fprintf(stderr, "%s: cannot mount untrusted character-device [%s]", program,
+                        source.c_str());
+                return EX_USAGE;
+            }
+        }
+
+        if (!isDir && !isCharDev)
+        {
+            fprintf(stderr,
+                    "%s: cannot mount from invalid source [%s], it is neither a file nor a "
+                    "directory.\n",
+                    program, source.c_str());
+            return EX_USAGE;
+        }
+
+        if (stat(target.c_str(), &sb))
+        {
+            fprintf(stderr, "%s: cannot mount on invalid target [%s]. stat failed with %s\n",
+                    program, target.c_str(), strerror(errno));
+            return EX_USAGE;
+        }
+
+        const bool target_exists =
+            ((isDir && S_ISDIR(sb.st_mode)) || (isCharDev && S_ISREG(sb.st_mode)));
+        if (!target_exists)
+        {
+            fprintf(stderr,
+                    "%s: cannot mount on invalid target [%s], it is not a %s as the source\n",
+                    program, target.c_str(), isDir ? "directory" : "file");
+            return EX_USAGE;
+        }
+
+        // Mount the source path as the target path.
+        // First bind to mount an existing directory node into the chroot.
+        // MS_BIND ignores other flags.
+        if (arg == "-b") // Shared or Bind Mount.
+        {
+            const int retval
+                = MOUNT(source.c_str(), target.c_str(), nullptr, (MS_MGC_VAL | MS_BIND | MS_REC), nullptr);
+            if (retval)
+            {
+                fprintf(stderr, "%s: mount failed to bind [%s] to [%s]: %s.\n", program, source.c_str(),
+                        target.c_str(), strerror(errno));
+                return EX_SOFTWARE;
+            }
+        }
+        else if (arg == "-r") // Readonly Mount.
+        {
+            // Now we need to set read-only and other flags with a remount.
+            int retval = MOUNT(source.c_str(), target.c_str(), nullptr,
+                               (MS_BIND | MS_REC | MS_REMOUNT | MS_NOATIME | MS_NODEV | MS_NOSUID
+                                | MS_RDONLY | MS_SILENT),
+                               nullptr);
+            if (retval)
+            {
+                fprintf(stderr, "%s: mount failed remount [%s] readonly: %s.\n", program, target.c_str(),
+                        strerror(errno));
+                return EX_SOFTWARE;
+            }
+
+            retval = MOUNT(source.c_str(), target.c_str(), nullptr, (MS_UNBINDABLE | MS_REC), nullptr);
+            if (retval)
+            {
+                fprintf(stderr, "%s: mount failed make [%s] private: %s.\n", program, target.c_str(),
+                        strerror(errno));
+                return EX_SOFTWARE;
+            }
+        }
+    }
+
+    fflush(stderr);
+    return EX_OK;
+}
+
 bool coolmount(const std::string& arg, std::string source, std::string target)
 {
     source = Util::trim(source, '/');
     target = Util::trim(target, '/');
+#if 0
     const std::string cmd = Poco::Path(Util::getApplicationPath(), "coolmount").toString() + ' '
                             + arg + ' ' + source + ' ' + target;
     LOG_TRC("Executing coolmount command: " << cmd);
-    return !system(cmd.c_str());
+#endif
+    return !domount(arg, source, target);
 }
 
 bool bind(const std::string& source, const std::string& target)
