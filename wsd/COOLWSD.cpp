@@ -1946,6 +1946,10 @@ void COOLWSD::innerInitialize(Application& self)
         throw std::runtime_error("Do not run as root. Please run as cool user.");
     }
 
+    uid_t uid = geteuid();
+    gid_t gid = getegid();
+    JailUtil::becomeMountingUser(uid, gid);
+
     Util::setApplicationPath(Poco::Path(Application::instance().commandPath()).parent().toString());
 
     StartTime = std::chrono::steady_clock::now();
@@ -2545,6 +2549,11 @@ void COOLWSD::innerInitialize(Application& self)
     // Setup the jails.
     JailUtil::cleanupJails(CleanupChildRoot);
     JailUtil::setupChildRoot(IsBindMountingEnabled, ChildRoot, SysTemplate);
+
+    // restorePremountUser probably doesn't work wrt log thread existing, but
+    // is an potential option I think in order to reopen in forked child, but
+    // we can just stay in this env for proof of concept for now
+    // restorePremountUser(uid, gid);
 
     LOG_DBG("FileServerRoot before config: " << FileServerRoot);
     FileServerRoot = getPathFromConfig("file_server_root_path");

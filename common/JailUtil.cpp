@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <string>
 
 #include "Log.hpp"
@@ -687,6 +688,62 @@ void setupRandomDeviceLinks(const std::string& sysTemplate)
 }
 
 } // namespace SysTemplate
+
+static void setdeny()
+{
+    std::ofstream of("/proc/self/setgroups");
+    of << "deny";
+}
+
+static void mapuser(uid_t origuid, uid_t newuid, gid_t origgid, gid_t newgid)
+{
+    {
+        std::ofstream of("/proc/self/uid_map");
+        of << newuid << " " << origuid << " 1";
+    }
+
+    {
+        std::ofstream of("/proc/self/gid_map");
+        of << newgid << " " << origgid << " 1";
+    }
+}
+
+bool becomeMountingUser(uid_t uid, gid_t gid)
+{
+    // Put this process into its own user and mount namespace.
+    if (unshare(CLONE_NEWNS | CLONE_NEWUSER) != 0)
+    {
+        // having multiple threads is a source of failure f.e.
+        fprintf(stderr, "createUserMountNamespace, unshare failed %s\n", strerror(errno));
+        return false;
+    }
+
+    // Do not propagate any mounts from this new namespace to the system.
+    if (mount("none", "/", nullptr, MS_REC | MS_PRIVATE, nullptr) != 0)
+    {
+        fprintf(stderr, "createUserMountNamespace, root mount failed %s\n", strerror(errno));
+        return false;
+    }
+
+    setdeny();
+
+    // Map this user as the root user of the new namespace
+    mapuser(uid, 0, gid, 0);
+
+    return true;
+}
+
+bool restorePremountUser(uid_t uid, gid_t gid)
+{
+    // undo map of this user to root
+    mapuser(0, uid, 0, gid);
+
+    assert(geteuid() == uid);
+    assert(getegid() == gid);
+
+    return true;
+}
+
 
 } // namespace JailUtil
 

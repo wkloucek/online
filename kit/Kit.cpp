@@ -3026,6 +3026,10 @@ void lokit_main(
 
         if (!ChildSession::NoCapsForKit)
         {
+            // uid_t uid = geteuid();
+            // gid_t gid = getegid();
+            // JailUtil::becomeMountingUser(uid, gid);
+
             std::chrono::time_point<std::chrono::steady_clock> jailSetupStartTime
                 = std::chrono::steady_clock::now();
 
@@ -3175,6 +3179,8 @@ void lokit_main(
                 LOG_SFL("chdir(\"/\") in jail failed");
                 Util::forcedExit(EX_SOFTWARE);
             }
+
+            // restorePremountUser(uid, gid);
 
 #ifndef __FreeBSD__
             dropCapability(CAP_SYS_CHROOT);
