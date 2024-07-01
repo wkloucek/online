@@ -5,7 +5,6 @@ set -e
 case "$1" in
     configure)
 	setcap cap_fowner,cap_chown=ep /usr/bin/coolforkit || true
-	setcap cap_sys_admin=ep /usr/bin/coolmount || true
 	if [ -f /etc/loolwsd/loolwsd.xml ]; then /usr/bin/coolconfig migrateconfig --write || true; fi
 
 	adduser --quiet --system --group --home /opt/cool cool

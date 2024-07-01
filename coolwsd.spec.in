@@ -95,7 +95,6 @@ getent passwd cool >/dev/null || useradd -g cool -r cool -d /opt/cool -s /bin/ba
 
 %post
 setcap cap_fowner,cap_chown=ep /usr/bin/coolforkit
-setcap cap_sys_admin=ep /usr/bin/coolmount
 if [ -f /etc/loolwsd/loolwsd.xml ]; then /usr/bin/coolconfig migrateconfig --write; fi
 # compatibility with older systemd versions
 SYSTEMD_VERSION=$(busctl --system get-property org.freedesktop.systemd1 /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager Version | grep -Eo [0-9]{3} | head -n 1)
