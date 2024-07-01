@@ -2553,7 +2553,7 @@ void COOLWSD::innerInitialize(Application& self)
     // restorePremountUser probably doesn't work wrt log thread existing, but
     // is an potential option I think in order to reopen in forked child, but
     // we can just stay in this env for proof of concept for now
-    // restorePremountUser(uid, gid);
+    // JailUtil::restorePremountUser(uid, gid);
 
     LOG_DBG("FileServerRoot before config: " << FileServerRoot);
     FileServerRoot = getPathFromConfig("file_server_root_path");

@@ -735,6 +735,13 @@ bool becomeMountingUser(uid_t uid, gid_t gid)
 
 bool restorePremountUser(uid_t uid, gid_t gid)
 {
+    if (unshare(CLONE_NEWUSER) != 0)
+    {
+        // having multiple threads is a source of failure f.e.
+        fprintf(stderr, "restorePremountUser, unshare failed %s\n", strerror(errno));
+        return false;
+    }
+
     // undo map of this user to root
     mapuser(0, uid, 0, gid);
 
