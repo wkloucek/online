@@ -139,6 +139,7 @@ public:
     // NB. see other Socket::Socket by init below.
     Socket(Type type)
         : _fd(createSocket(type))
+        , _open(_fd >= 0)
     {
         init(type);
     }
@@ -159,7 +160,13 @@ public:
         }
     }
 
+    /// Returns true if this socket is open, i.e. allowed to be polled and not shutdown
+    bool isOpen() const { return _open; }
+    /// Returns true if this socket has been closed, i.e. rejected from polling and potentially shutdown
+    bool isClosed() const { return !_open; }
+
     /// Create socket of the given type.
+    /// return >= 0 for a successfully created socket, -1 on error
     static int createSocket(Type type);
 
     void setClientAddress(const std::string& address)
@@ -365,6 +372,7 @@ protected:
     /// Used by accept() only.
     Socket(const int fd, Type type)
         : _fd(fd)
+        , _open(_fd >= 0)
     {
         init(type);
     }
@@ -373,6 +381,9 @@ protected:
 
     /// avoid doing a shutdown before close
     void setNoShutdown() { _noShutdown = true; }
+
+    /// Explicitly marks this socket closed, i.e. rejected from polling and potentially shutdown
+    void setClosed() { _open = false; }
 
 private:
     void init(Type type)
@@ -400,6 +411,8 @@ private:
 
     std::string _clientAddress;
     const int _fd;
+    /// True if this socket is open.
+    bool _open;
 
     // If _ignoreInput is true no more input from this socket will be processed.
     bool _ignoreInput;
@@ -957,7 +970,6 @@ public:
         _bytesSent(0),
         _bytesRecvd(0),
         _wsState(WSState::HTTP),
-        _closed(false),
         _sentHTTPContinue(false),
         _shutdownSignalled(false),
         _readType(readType),
@@ -972,7 +984,7 @@ public:
         LOG_TRC("StreamSocket dtor called with pending write: " << _outBuffer.size()
                                                                 << ", read: " << _inBuffer.size());
 
-        if (!_closed)
+        if (isOpen())
         {
             ASSERT_CORRECT_SOCKET_THREAD(this);
             if (_socketHandler)
@@ -987,7 +999,6 @@ public:
         }
     }
 
-    bool isClosed() const { return _closed; }
     bool isWebSocket() const { return _wsState == WSState::WS; }
     void setWebSocket() { _wsState = WSState::WS; }
 
@@ -1445,11 +1456,11 @@ protected:
         if (closed)
         {
             LOG_TRC("Closed. Firing onDisconnect.");
-            _closed = true;
+            setClosed();
             _socketHandler->onDisconnect();
         }
 
-        if (_closed)
+        if (isClosed())
             disposition.setClosed();
     }
 
@@ -1636,9 +1647,6 @@ private:
     uint64_t _bytesRecvd;
 
     enum class WSState { HTTP, WS } _wsState;
-
-    /// True if we are already closed.
-    bool _closed;
 
     /// True if we've received a Continue in response to an Expect: 100-continue
     bool _sentHTTPContinue;
