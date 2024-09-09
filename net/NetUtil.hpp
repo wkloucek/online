@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <string>
 #include <memory>
@@ -27,6 +28,46 @@ struct sockaddr;
 
 namespace net
 {
+
+class Config
+{
+public:
+    /// WebSocketHandler ping timeout in us (2s default). Zero disables metric.
+    std::chrono::microseconds WSPingTimeout;
+    /// WebSocketHandler ping period in us (3s default), i.e. duration until next ping. Zero disables metric.
+    std::chrono::microseconds WSPingPeriod;
+    /// http::Session timeout in us (30s default). Zero disables metric.
+    std::chrono::microseconds HTTPTimeout;
+
+    /// Socket maximum duration in seconds (12h). Zero disables metric.
+    std::chrono::seconds MaxDuration;
+    /// Socket minimum bits per seconds throughput (0). Zero disables metric.
+    double MinBytesPerSec;
+
+    /// Socket poll timeout in us (64s), useful to increase for debugging.
+    std::chrono::microseconds SocketPollTimeout;
+
+private:
+    Config()
+        : WSPingTimeout(std::chrono::milliseconds(2000))
+        , WSPingPeriod(std::chrono::milliseconds(3000))
+        , HTTPTimeout(std::chrono::milliseconds(30000))
+        , MaxDuration(std::chrono::seconds(43200))
+        , MinBytesPerSec(0.0)
+        , SocketPollTimeout(std::chrono::seconds(64))
+    {
+    }
+
+public:
+    Config(const Config&) = delete;
+    Config(Config&&) = delete;
+
+    static Config& get()
+    {
+        static Config def;
+        return def;
+    }
+};
 
 #if !MOBILEAPP
 
