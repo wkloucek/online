@@ -39,6 +39,8 @@ public:
     /// http::Session timeout in us (30s default). Zero disables metric.
     std::chrono::microseconds HTTPTimeout;
 
+    /// Maximum total connections (9999 or MAX_CONNECTIONS). Zero disables metric.
+    size_t MaxConnections;
     /// Socket maximum duration in seconds (12h). Zero disables metric.
     std::chrono::seconds MaxDuration;
     /// Socket minimum bits per seconds throughput (0). Zero disables metric.
@@ -52,6 +54,7 @@ private:
         : WSPingTimeout(std::chrono::milliseconds(2000))
         , WSPingPeriod(std::chrono::milliseconds(3000))
         , HTTPTimeout(std::chrono::milliseconds(30000))
+        , MaxConnections(9999)
         , MaxDuration(std::chrono::seconds(43200))
         , MinBytesPerSec(0.0)
         , SocketPollTimeout(std::chrono::seconds(64))

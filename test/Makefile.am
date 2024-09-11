@@ -93,6 +93,7 @@ all_la_unit_tests = \
 	unit-timeout.la \
 	unit-timeout_socket.la \
 	unit-timeout_wsping.la \
+	unit-timeout_conn.la \
 	unit-timeout_none.la \
 	unit-base.la
 #	unit-admin.la
@@ -230,6 +231,8 @@ unit_timeout_socket_la_SOURCES = UnitTimeoutSocket.cpp
 unit_timeout_socket_la_LIBADD = $(CPPUNIT_LIBS)
 unit_timeout_wsping_la_SOURCES = UnitTimeoutWSPing.cpp
 unit_timeout_wsping_la_LIBADD = $(CPPUNIT_LIBS)
+unit_timeout_conn_la_SOURCES = UnitTimeoutConnections.cpp
+unit_timeout_conn_la_LIBADD = $(CPPUNIT_LIBS)
 unit_timeout_none_la_SOURCES = UnitTimeoutNone.cpp
 unit_timeout_none_la_LIBADD = $(CPPUNIT_LIBS)
 unit_prefork_la_SOURCES = UnitPrefork.cpp

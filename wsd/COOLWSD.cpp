@@ -2091,7 +2091,7 @@ void COOLWSD::innerInitialize(Application& self)
         { "net.ws.ping.timeout", "2000000" }, // WebSocketHandler ping timeout in us (2s). Zero disables metric.
         { "net.ws.ping.period", "3000000" }, // WebSocketHandler ping period in us (3s), i.e. duration until next ping.
         { "net.http.timeout", "30000000" }, // http::Session timeout in us (30s). Zero disables metric.
-        { "net.maxconnections", "100000" }, // Socket maximum connections (100000). Zero disables metric.
+        { "net.maxconnections", "9999" }, // Maximum total connections (9999 or MAX_CONNECTIONS). Zero disables metric.
         { "net.maxduration", "43200" }, // Socket maximum duration in seconds (12h). Zero disables metric.
         { "net.minbps", "0" }, // Socket minimum bits per seconds throughput (0). Increase for debugging. Zero disables metric.
         { "net.socketpoll.timeout", "64000000" }, // SocketPoll timeout in us (64s).
@@ -2222,6 +2222,9 @@ void COOLWSD::innerInitialize(Application& self)
     // Set default values, in case they are missing from the config file.
     Poco::AutoPtr<AppConfigMap> defConfig(new AppConfigMap(DefAppConfig));
     conf.addWriteable(defConfig, PRIO_SYSTEM); // Lowest priority
+
+    // Align values with compile-time settings
+    conf.setInt("net.maxconnections", std::max<size_t>(3, MAX_CONNECTIONS)); // min 3-connections
 
 #if !MOBILEAPP
 
@@ -2379,6 +2382,8 @@ void COOLWSD::innerInitialize(Application& self)
         netConfig.WSPingPeriod = std::chrono::microseconds(v);
         v = getConfigValue<int>(conf, "net.http.timeout", 30000000);
         netConfig.HTTPTimeout = std::chrono::microseconds(v);
+        v = getConfigValue<int>(conf, "net.maxconnections", MAX_CONNECTIONS);
+        netConfig.MaxConnections = std::max<size_t>(3, static_cast<size_t>(v)); // min 3-connections
         v = getConfigValue<int>(conf, "net.maxduration", 43200);
         netConfig.MaxDuration = std::chrono::seconds(v);
         v = getConfigValue<int>(conf, "net.minbps", 0);
@@ -2796,21 +2801,22 @@ void COOLWSD::innerInitialize(Application& self)
     {
         conf.setString("feedback.show", "true");
         conf.setString("welcome.enable", "true");
-        COOLWSD::MaxConnections = MAX_CONNECTIONS;
+        COOLWSD::MaxConnections = net::Config::get().MaxConnections; // aligned w/ MAX_CONNECTIONS above
         COOLWSD::MaxDocuments = MAX_DOCUMENTS;
     }
 #else
     {
-        COOLWSD::MaxConnections = MAX_CONNECTIONS;
+        COOLWSD::MaxConnections = net::Config::get().MaxConnections; // aligned w/ MAX_CONNECTIONS above
         COOLWSD::MaxDocuments = MAX_DOCUMENTS;
     }
 #endif
     {
         net::Config& netConfig = net::Config::get();
+        netConfig.MaxConnections = COOLWSD::MaxConnections; // realign
         LOG_DBG("net::Defaults: WSPing[Timeout "
                 << netConfig.WSPingTimeout << ", Period " << netConfig.WSPingPeriod << "], HTTP[Timeout "
-                << netConfig.HTTPTimeout << "], Socket[MaxDuration " << netConfig.MaxDuration
-                << ", MinBytesPerSec " << netConfig.MinBytesPerSec
+                << netConfig.HTTPTimeout << "], Socket[MaxConnections " << netConfig.MaxConnections
+                << ", MaxDuration " << netConfig.MaxDuration << ", MinBytesPerSec " << netConfig.MinBytesPerSec
                 << "], SocketPoll[Timeout " << netConfig.SocketPollTimeout << "]");
     }
 
@@ -2984,6 +2990,7 @@ void COOLWSD::innerInitialize(Application& self)
 #endif
 
     WebServerPoll = std::make_unique<TerminatingPoll>("websrv_poll");
+    WebServerPoll->setLimiter( net::Config::get().MaxConnections );
 
 #if !MOBILEAPP
     net::AsyncDNS::startAsyncDNS();

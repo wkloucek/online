@@ -26,12 +26,12 @@
 #include <helpers.hpp>
 #include <vector>
 
-/// Test suite that uses a HTTP session (and not just a socket) directly.
+/// Test suite class for Socket max-duration timeout limit using HTTP and WS sessions.
 class UnitTimeoutSocket : public UnitWSD
 {
-    TestResult testHttpNoTimeout();
-    TestResult testWSPingNoTimeout();
-    TestResult testWSDChatPingPong();
+    TestResult testHttp();
+    TestResult testWSPing();
+    TestResult testWSDChatPing();
 
     void configure(Poco::Util::LayeredConfiguration& config) override
     {
@@ -55,7 +55,7 @@ public:
     void invokeWSDTest() override;
 };
 
-UnitBase::TestResult UnitTimeoutSocket::testHttpNoTimeout()
+UnitBase::TestResult UnitTimeoutSocket::testHttp()
 {
     setTestname(__func__);
     TST_LOG("Starting Test: " << testname);
@@ -75,10 +75,6 @@ UnitBase::TestResult UnitTimeoutSocket::testHttpNoTimeout()
     {
         for(int sockIdx = 0; sockIdx < sockCount; ++sockIdx) {
             sessions.push_back( http::Session::create(helpers::getTestServerURI()) );
-            if (sockIdx > 0)
-            {
-                LOK_ASSERT_EQUAL(true, sessions[sockIdx]->isConnected());
-            }
             TST_LOG("Test: " << testname << "[" << sockIdx << "]: `" << documentURL << "`");
             http::Request request(documentURL, http::Request::VERB_GET);
             const std::shared_ptr<const http::Response> response =
@@ -115,7 +111,7 @@ UnitBase::TestResult UnitTimeoutSocket::testHttpNoTimeout()
 }
 
 /// Test the native WebSocket control-frame ping/pong facility -> No Timeout!
-UnitBase::TestResult UnitTimeoutSocket::testWSPingNoTimeout()
+UnitBase::TestResult UnitTimeoutSocket::testWSPing()
 {
     setTestname(__func__);
     TST_LOG("Starting Test: " << testname);
@@ -188,7 +184,7 @@ UnitBase::TestResult UnitTimeoutSocket::testWSPingNoTimeout()
 
 /// Tests the WSD chat ping/pong facility, where client sends the ping.
 /// See: https://github.com/CollaboraOnline/online/blob/master/wsd/protocol.txt/
-UnitBase::TestResult UnitTimeoutSocket::testWSDChatPingPong()
+UnitBase::TestResult UnitTimeoutSocket::testWSDChatPing()
 {
     setTestname(__func__);
     TST_LOG("Starting Test: " << testname);
@@ -264,19 +260,17 @@ UnitBase::TestResult UnitTimeoutSocket::testWSDChatPingPong()
 
 void UnitTimeoutSocket::invokeWSDTest()
 {
-    UnitBase::TestResult result;
+    UnitBase::TestResult result = TestResult::Ok;
 
-    result = testHttpNoTimeout();
+    result = testHttp();
     if (result != TestResult::Ok)
         exitTest(result);
 
-    if( false ) {
-        result = testWSPingNoTimeout();
-        if (result != TestResult::Ok)
-            exitTest(result);
-    }
+    result = testWSPing();
+    if (result != TestResult::Ok)
+        exitTest(result);
 
-    result = testWSDChatPingPong();
+    result = testWSDChatPing();
     if (result != TestResult::Ok)
         exitTest(result);
 

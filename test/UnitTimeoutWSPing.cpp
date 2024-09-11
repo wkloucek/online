@@ -26,10 +26,10 @@
 #include <helpers.hpp>
 #include <vector>
 
-/// Test suite that uses a HTTP session (and not just a socket) directly.
+/// Test suite class for WS Ping (native frame) timeout limit using a WS sessions.
 class UnitTimeoutWSPing : public UnitWSD
 {
-    TestResult testWSPingTimeout();
+    TestResult testWSPing();
 
     void configure(Poco::Util::LayeredConfiguration& config) override
     {
@@ -49,7 +49,7 @@ public:
 };
 
 /// Attempt to test the native WebSocket control-frame ping/pong facility -> Timeout!
-UnitBase::TestResult UnitTimeoutWSPing::testWSPingTimeout()
+UnitBase::TestResult UnitTimeoutWSPing::testWSPing()
 {
     setTestname(__func__);
     TST_LOG("Starting Test: " << testname);
@@ -124,7 +124,7 @@ void UnitTimeoutWSPing::invokeWSDTest()
 {
     UnitBase::TestResult result;
 
-    result = testWSPingTimeout();
+    result = testWSPing();
     if (result != TestResult::Ok)
         exitTest(result);
 
