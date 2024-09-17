@@ -250,6 +250,8 @@ L.Clipboard = L.Class.extend({
 	// completeFn: called on completion - with response.
 	// progressFn: allows splitting the progress bar up.
 	_doAsyncDownload: function(type,url,optionalFormData,forClipboard,completeFn,progressFn,onErrorFn) {
+		if (window.ThisIsAMobileApp) return;
+
 		try {
 			var that = this;
 			var request = new XMLHttpRequest();
@@ -690,7 +692,8 @@ L.Clipboard = L.Class.extend({
 			return;
 		}
 
-		if (document.execCommand(operation) &&
+		if (!window.ThisIsAMobileApp && // in mobile apps, we want to drop straight to navigatorClipboardRead as execCommand will require user interaction...
+			document.execCommand(operation) &&
 			serial !== this._clipboardSerial) {
 			window.app.console.log('copied successfully');
 			this._unoCommandForCopyCutPaste = null;
@@ -833,10 +836,10 @@ L.Clipboard = L.Class.extend({
 			window.app.console.error('Already have ' + this._commandCompletion.length +
 						 ' pending clipboard command(s)');
 
-
-
 		if (window.ThisIsTheAndroidApp) {
 			window.COOLMessageHandler.writeToClipboard(); // Native code also handles the clipboard request, so no need for awaitPromise
+		} else if (window.ThisIsTheiOSApp) {
+			await window.webkit.messageHandlers.clipboard.postMessage(`write`); // Ditto with native code handling clipboard request
 		} else {
 			const url = this.getMetaURL() + '&MimeType=text/html,text/plain;charset=utf-8';
 
@@ -887,7 +890,7 @@ L.Clipboard = L.Class.extend({
 
 	// Executes the navigator.clipboard.write() call, if it's available.
 	_navigatorClipboardWrite: function() {
-		if (!L.Browser.hasNavigatorClipboardWrite && !window.ThisIsTheAndroidApp) {
+		if (!L.Browser.hasNavigatorClipboardWrite && !window.ThisIsTheAndroidApp && !window.ThisIsTheiOSApp) {
 			return false;
 		}
 
@@ -939,6 +942,26 @@ L.Clipboard = L.Class.extend({
 		try {
 			if (window.ThisIsTheAndroidApp) {
 				const clipboardData /*: [string?, string?] */ = window.COOLMessageHandler.readFromClipboard();
+
+				const dataByMimeType = {};
+
+				if (clipboardData[0]) {
+					dataByMimeType['text/plain'] = clipboardData[0];
+				}
+
+				if (clipboardData[1]) {
+					dataByMimeType['text/html'] = clipboardData[1];
+				}
+
+				if (Object.keys(dataByMimeType).length === 0) {
+					clipboardContents = [];
+				} else {
+					clipboardContents = [ new ClipboardItem(dataByMimeType) ];
+				}
+			} else if (window.ThisIsTheiOSApp) {
+				const encodedClipboardData = await window.webkit.messageHandlers.clipboard.postMessage('read');
+				const clipboardData = Array.from(encodedClipboardData.split(' '))
+										   .map(encoded => encoded === '(null)' ? '' : window.b64d(encoded));
 
 				const dataByMimeType = {};
 
@@ -1010,7 +1033,7 @@ L.Clipboard = L.Class.extend({
 
 	// Executes the navigator.clipboard.read() call, if it's available.
 	_navigatorClipboardRead: function(isSpecial) {
-		if (!L.Browser.hasNavigatorClipboardRead && !window.ThisIsTheAndroidApp) {
+		if (!L.Browser.hasNavigatorClipboardRead && !window.ThisIsTheAndroidApp && !window.ThisIsTheiOSApp) {
 			return false;
 		}
 
@@ -1023,12 +1046,6 @@ L.Clipboard = L.Class.extend({
 	// We try to massage and re-emit these, to get good security event / credentials.
 	filterExecCopyPaste: function(cmd) {
 		if (this._map['wopi'].DisableCopy && (cmd === '.uno:Copy' || cmd === '.uno:Cut')) {
-			// perform internal operations
-			app.socket.sendMessage('uno ' + cmd);
-			return true;
-		}
-
-		if (window.ThisIsAMobileApp && (cmd === '.uno:Paste' || cmd === '.uno:PasteSpecial')) {
 			// perform internal operations
 			app.socket.sendMessage('uno ' + cmd);
 			return true;
@@ -1369,7 +1386,5 @@ L.Clipboard = L.Class.extend({
 });
 
 L.clipboard = function(map) {
-	if (window.ThisIsAMobileApp)
-		window.app.console.log('======> Assertion failed!? No L.Clipboard object should be needed in a mobile app');
 	return new L.Clipboard(map);
 };
