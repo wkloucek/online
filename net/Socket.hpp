@@ -151,6 +151,8 @@ public:
         , _open(_fd >= 0)
         , _creationTime(creationTime)
         , _lastSeenTime(_creationTime)
+        , _bytesSent(0)
+        , _bytesRcvd(0)
     {
         init();
     }
@@ -194,6 +196,18 @@ public:
 
     /// Sets monotonic timestamp of last received signal from remote
     void setLastSeenTime(std::chrono::steady_clock::time_point now) { _lastSeenTime = now; }
+
+    /// Returns bytes sent statistic
+    uint64_t bytesSent() const { return _bytesSent; }
+    /// Returns bytes received statistic
+    uint64_t bytesRcvd() const { return _bytesRcvd; }
+
+    /// Get input/output statistics on this stream
+    void getIOStats(uint64_t &sent, uint64_t &recv) const
+    {
+        sent = _bytesSent;
+        recv = _bytesRcvd;
+    }
 
     /// Checks whether socket is due for forced removal, e.g. by internal timeout or small throughput. Method will shutdown connection and socket on forced removal.
     /// Returns true in case of forced removal, caller shall stop processing
@@ -398,11 +412,18 @@ protected:
         , _open(_fd >= 0)
         , _creationTime(creationTime)
         , _lastSeenTime(_creationTime)
+        , _bytesSent(0)
+        , _bytesRcvd(0)
     {
         init();
     }
 
     inline void logPrefix(std::ostream& os) const { os << '#' << _fd << ": "; }
+
+    /// Adds `len` sent bytes to statistic
+    void notifyBytesSent(uint64_t len) { _bytesSent += len; }
+    /// Adds `len` received bytes to statistic
+    void notifyBytesRcvd(uint64_t len) { _bytesRcvd += len; }
 
     /// avoid doing a shutdown before close
     void setNoShutdown() { _noShutdown = true; }
@@ -452,6 +473,8 @@ private:
 
     const std::chrono::steady_clock::time_point _creationTime;
     std::chrono::steady_clock::time_point _lastSeenTime;
+    uint64_t _bytesSent;
+    uint64_t _bytesRcvd;
 
     // If _ignoreInput is true no more input from this socket will be processed.
     bool _ignoreInput;
@@ -1032,8 +1055,6 @@ public:
         _httpTimeout( net::Config::get().HTTPTimeout ),
         _minBytesPerSec( net::Config::get().MinBytesPerSec ),
         _hostname(std::move(host)),
-        _bytesSent(0),
-        _bytesRecvd(0),
         _wsState(WSState::HTTP),
         _sentHTTPContinue(false),
         _shutdownSignalled(false),
@@ -1255,7 +1276,7 @@ public:
             {
                 LOG_ASSERT_MSG(len <= ssize_t(sizeof(buf)),
                                "Read more data than the buffer size");
-                _bytesRecvd += len;
+                notifyBytesRcvd(len);
                 _inBuffer.append(&buf[0], len);
             }
             // else poll will handle errors.
@@ -1277,7 +1298,7 @@ public:
             std::vector<char>buf(available);
             len = readData(buf.data(), available);
             assert(len == available);
-            _bytesRecvd += len;
+            notifyBytesRcvd(len);
             assert(_inBuffer.empty());
             _inBuffer.append(buf.data(), len);
         }
@@ -1359,13 +1380,6 @@ public:
                      Poco::Net::HTTPRequest &request,
                      std::chrono::steady_clock::time_point &lastHTTPHeader,
                      MessageMap& map);
-
-    /// Get input/output statistics on this stream
-    void getIOStats(uint64_t &sent, uint64_t &recv)
-    {
-        sent = _bytesSent;
-        recv = _bytesRecvd;
-    }
 
     Buffer& getInBuffer() { return _inBuffer; }
 
@@ -1574,7 +1588,7 @@ public:
             {
                 LOG_ASSERT_MSG(len <= ssize_t(_outBuffer.size()),
                                "Consumed more data than available");
-                _bytesSent += len;
+                notifyBytesSent(len);
                 _outBuffer.eraseFirst(len);
             }
             else
@@ -1714,9 +1728,6 @@ private:
 
     Buffer _inBuffer;
     Buffer _outBuffer;
-
-    uint64_t _bytesSent;
-    uint64_t _bytesRecvd;
 
     enum class WSState : uint8_t { HTTP, WS } _wsState;
     static std::string toString(WSState t);

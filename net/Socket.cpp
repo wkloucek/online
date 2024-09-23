@@ -136,11 +136,25 @@ std::ostream& Socket::streamStats(std::ostream& os, const std::chrono::steady_cl
     const auto durTotal = std::chrono::duration_cast<std::chrono::milliseconds>(now - _creationTime);
     const auto durLast = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastSeenTime);
 
+    float kBpsIn, kBpsOut;
+    if (durTotal.count() > 0)
+    {
+        kBpsIn = (float)_bytesRcvd / (float)durTotal.count();
+        kBpsOut = (float)_bytesSent / (float)durTotal.count();
+    }
+    else
+    {
+        kBpsIn = (float)_bytesRcvd / 1000.0f;
+        kBpsOut = (float)_bytesSent / 1000.0f;
+    }
+
     const std::streamsize p = os.precision();
     os.precision(1);
     os << "Stats[dur[total "
         << durTotal.count() << "ms, last "
-        << durLast.count() << " ms]]";
+        << durLast.count() << " ms], kBps[in "
+        << kBpsIn << ", out " << kBpsOut
+        << "]]";
     os.precision(p);
     return os;
 }
@@ -1127,8 +1141,8 @@ void StreamSocket::dumpState(std::ostream& os)
     const int events = getPollEvents(std::chrono::steady_clock::now(), timeoutMaxMicroS);
     os << '\t' << std::setw(6) << getFD() << "\t0x" << std::hex << events << std::dec << '\t'
        << (ignoringInput() ? "ignore\t" : "process\t") << std::setw(6) << _inBuffer.size() << '\t'
-       << std::setw(6) << _outBuffer.size() << '\t' << " r: " << std::setw(6) << _bytesRecvd
-       << "\t w: " << std::setw(6) << _bytesSent << '\t' << clientAddress() << '\t';
+       << std::setw(6) << _outBuffer.size() << '\t' << " r: " << std::setw(6) << bytesRcvd()
+       << "\t w: " << std::setw(6) << bytesSent() << '\t' << clientAddress() << '\t';
     _socketHandler->dumpState(os);
     if (_inBuffer.size() > 0)
         Util::dumpHex(os, _inBuffer, "\t\tinBuffer:\n", "\t\t");
@@ -1532,7 +1546,7 @@ bool StreamSocket::checkRemoval(std::chrono::steady_clock::time_point now)
         std::chrono::duration_cast<std::chrono::milliseconds>(now - getCreationTime());
     const auto durLast =
         std::chrono::duration_cast<std::chrono::milliseconds>(now - getLastSeenTime());
-    const double bytesPerSecIn = durTotal.count() > 0 ? (double)_bytesRecvd / ((double)durTotal.count() / 1000.0) : (double)_bytesRecvd;
+    const double bytesPerSecIn = durTotal.count() > 0 ? (double)bytesRcvd() / ((double)durTotal.count() / 1000.0) : (double)bytesRcvd();
     const bool c1 = now < getCreationTime();
     const bool c2 = (_maxDuration > std::chrono::microseconds::zero() && durTotal > _maxDuration);
     const bool c3 = (_pollTimeout > std::chrono::microseconds::zero() && durLast > _pollTimeout);
@@ -1816,7 +1830,7 @@ bool StreamSocket::compactChunks(MessageMap& map)
 bool StreamSocket::sniffSSL() const
 {
     // Only sniffing the first bytes of a socket.
-    if (_bytesSent > 0 || _bytesRecvd != _inBuffer.size() || _bytesRecvd < 6)
+    if (bytesSent() > 0 || bytesRcvd() != _inBuffer.size() || bytesRcvd() < 6)
         return false;
 
     // 0x0000  16 03 01 02 00 01 00 01
