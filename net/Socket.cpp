@@ -96,7 +96,7 @@ size_t SocketPoll::StatsConnectionMod(size_t added, size_t removed) {
 
 #define SOCKET_ABSTRACT_UNIX_NAME "0coolwsd-"
 
-std::string Socket::toString(Type t)
+std::string Socket::toString(Type t) noexcept
 {
     switch (t)
     {
@@ -1510,7 +1510,7 @@ LocalServerSocket::~LocalServerSocket()
 
 #endif // !MOBILEAPP
 
-std::string StreamSocket::toString(WSState t)
+std::string StreamSocket::toString(WSState t) noexcept
 {
     if( WSState::WS == t )
     {
@@ -1536,7 +1536,7 @@ std::ostream& StreamSocket::stream(std::ostream& os) const
     return os << "]";
 }
 
-bool StreamSocket::checkRemoval(std::chrono::steady_clock::time_point now)
+bool StreamSocket::checkRemoval(std::chrono::steady_clock::time_point now) noexcept
 {
     if (!isIPType()) // forced removal on IPv[46] network connections only
     {

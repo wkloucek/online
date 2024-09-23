@@ -164,14 +164,14 @@ namespace Util
 
     public:
         // default ctor without value initialization
-        constexpr TimeAverage()
+        constexpr TimeAverage() noexcept
             : _v1(0)
             , _area(0)
         {
         }
 
         // ctor with value initialization
-        constexpr TimeAverage(time_point t, double v)
+        constexpr TimeAverage(time_point t, double v) noexcept
             : _t0(t)
             , _t1(t)
             , _v1(v)
@@ -180,13 +180,13 @@ namespace Util
         }
 
         // returns true if initialized via reset() or ctor
-        constexpr bool initialized() const
+        constexpr bool initialized() const noexcept
         {
             return _t0.time_since_epoch() != time_point::duration::zero();
         }
 
         // initialize instance with given values
-        void reset(time_point t, double v)
+        void reset(time_point t, double v) noexcept
         {
             _t0 = t;
             _t1 = t;
@@ -195,7 +195,7 @@ namespace Util
         }
 
         // move startTime() and endTime() to given time-point maintaining duration()
-        void moveTo(time_point t)
+        void moveTo(time_point t) noexcept
         {
             auto dt = t - _t1;
             _t0 += dt;
@@ -204,7 +204,7 @@ namespace Util
 
         // Adds an arbitrary value at given time-point, returns new average
         // May reset() instance and returns `vn` if not yet initialized()
-        double add(time_point t, double v)
+        double add(time_point t, double v) noexcept
         {
             if (!initialized())
             {
@@ -225,20 +225,20 @@ namespace Util
         }
 
         // Returns average
-        constexpr double average() const
+        constexpr double average() const noexcept
         {
             const double dt = duration();
             return dt > std::numeric_limits<double>::epsilon() ? _area / dt : _v1;
         }
 
         // Returns last value
-        constexpr double last() const { return _v1; }
+        constexpr double last() const noexcept { return _v1; }
         // Returns last time-point
-        constexpr std::chrono::steady_clock::time_point lastTime() const { return _t1; }
+        constexpr std::chrono::steady_clock::time_point lastTime() const noexcept { return _t1; }
         // Returns first time-point
-        constexpr std::chrono::steady_clock::time_point startTime() const { return _t0; }
+        constexpr std::chrono::steady_clock::time_point startTime() const noexcept { return _t0; }
         // Returns duration
-        constexpr double duration() const
+        constexpr double duration() const noexcept
         {
             return std::chrono::duration<double>(_t1 - _t0).count();
         }

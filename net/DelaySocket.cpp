@@ -27,7 +27,7 @@ class DelaySocket : public Socket {
                                  EofFlushWrites, // finish up writes and close
                                  Closed };
 
-    static const char* toString(State s) {
+    static const char* toString(State s) noexcept {
         if( s == State::ReadWrite ) return "ReadWrite";
         else if( s == State::EofFlushWrites ) return "EofFlushWrites";
         else return "Closed";

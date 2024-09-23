@@ -1216,9 +1216,9 @@ public:
     bool isConnected() const { return _connected; };
 
     /// Set the timeout, in microseconds.
-    void setTimeout(const std::chrono::microseconds timeout) { _timeout = timeout; }
+    void setTimeout(const std::chrono::microseconds timeout) noexcept { _timeout = timeout; }
     /// Get the timeout, in microseconds.
-    std::chrono::microseconds getTimeout() const { return _timeout; }
+    std::chrono::microseconds getTimeout() const noexcept { return _timeout; }
 
     /// The response we _got_ for our request. Do *not* use this to _send_ a response!
     const std::shared_ptr<Response>& response() const { return _response; }

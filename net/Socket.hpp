@@ -140,7 +140,7 @@ public:
     static std::atomic<bool> InhibitThreadChecks;
 
     enum class Type : uint8_t { IPv4, IPv6, All, Unix };
-    static std::string toString(Type t);
+    static std::string toString(Type t) noexcept;
 
     // NB. see other Socket::Socket by init below.
     Socket(Type type,
@@ -171,18 +171,18 @@ public:
     }
 
     /// Returns true if this socket is open, i.e. allowed to be polled and not shutdown
-    bool isOpen() const { return _open; }
+    bool isOpen() const noexcept { return _open; }
     /// Returns true if this socket has been closed, i.e. rejected from polling and potentially shutdown
-    bool isClosed() const { return !_open; }
+    bool isClosed() const noexcept { return !_open; }
 
-    constexpr Type type() const { return _type; }
-    constexpr bool isIPType() const { return Type::IPv4 == _type || Type::IPv6 == _type; }
+    constexpr Type type() const noexcept { return _type; }
+    constexpr bool isIPType() const noexcept { return Type::IPv4 == _type || Type::IPv6 == _type; }
     void setClientAddress(const std::string& address, unsigned int port=0) { _clientAddress = address; _clientPort=port; }
-    const std::string& clientAddress() const { return _clientAddress; }
-    unsigned int clientPort() const { return _clientPort; }
+    const std::string& clientAddress() const noexcept { return _clientAddress; }
+    unsigned int clientPort() const noexcept { return _clientPort; }
 
     /// Returns the OS native socket fd.
-    constexpr int getFD() const { return _fd; }
+    constexpr int getFD() const noexcept { return _fd; }
 
     std::ostream& streamStats(std::ostream& os, const std::chrono::steady_clock::time_point &now) const;
     std::string getStatsString(const std::chrono::steady_clock::time_point &now) const;
@@ -190,20 +190,20 @@ public:
     virtual std::ostream& stream(std::ostream& os) const  { return streamImpl(os); }
 
     /// Returns monotonic creation timestamp
-    constexpr std::chrono::steady_clock::time_point getCreationTime() const { return _creationTime; }
+    constexpr std::chrono::steady_clock::time_point getCreationTime() const noexcept { return _creationTime; }
     /// Returns monotonic timestamp of last received signal from remote
-    constexpr std::chrono::steady_clock::time_point getLastSeenTime() const { return _lastSeenTime; }
+    constexpr std::chrono::steady_clock::time_point getLastSeenTime() const noexcept { return _lastSeenTime; }
 
     /// Sets monotonic timestamp of last received signal from remote
-    void setLastSeenTime(std::chrono::steady_clock::time_point now) { _lastSeenTime = now; }
+    void setLastSeenTime(std::chrono::steady_clock::time_point now) noexcept { _lastSeenTime = now; }
 
     /// Returns bytes sent statistic
-    constexpr uint64_t bytesSent() const { return _bytesSent; }
+    constexpr uint64_t bytesSent() const noexcept { return _bytesSent; }
     /// Returns bytes received statistic
-    constexpr uint64_t bytesRcvd() const { return _bytesRcvd; }
+    constexpr uint64_t bytesRcvd() const noexcept { return _bytesRcvd; }
 
     /// Get input/output statistics on this stream
-    constexpr void getIOStats(uint64_t &sent, uint64_t &recv) const
+    constexpr void getIOStats(uint64_t &sent, uint64_t &recv) const noexcept
     {
         sent = _bytesSent;
         recv = _bytesRcvd;
@@ -211,7 +211,7 @@ public:
 
     /// Checks whether socket is due for forced removal, e.g. by internal timeout or small throughput. Method will shutdown connection and socket on forced removal.
     /// Returns true in case of forced removal, caller shall stop processing
-    virtual bool checkRemoval(std::chrono::steady_clock::time_point /* now */) { return false; }
+    virtual bool checkRemoval(std::chrono::steady_clock::time_point /* now */) noexcept { return false; }
 
     /// Shutdown the socket.
     /// TODO: Support separate read/write shutdown.
@@ -421,18 +421,18 @@ protected:
     inline void logPrefix(std::ostream& os) const { os << '#' << _fd << ": "; }
 
     /// Adds `len` sent bytes to statistic
-    constexpr void notifyBytesSent(uint64_t len) { _bytesSent += len; }
+    constexpr void notifyBytesSent(uint64_t len) noexcept { _bytesSent += len; }
     /// Adds `len` received bytes to statistic
-    constexpr void notifyBytesRcvd(uint64_t len) { _bytesRcvd += len; }
+    constexpr void notifyBytesRcvd(uint64_t len) noexcept { _bytesRcvd += len; }
 
     /// avoid doing a shutdown before close
     void setNoShutdown() { _noShutdown = true; }
 
     /// Explicitly marks this socket closed, i.e. rejected from polling and potentially shutdown
-    void setClosed() { _open = false; }
+    void setClosed() noexcept { _open = false; }
 
     /// Explicitly marks this socket and the given SocketDisposition closed
-    void setClosed(SocketDisposition &disposition) { setClosed(); disposition.setClosed(); }
+    void setClosed(SocketDisposition &disposition) noexcept { setClosed(); disposition.setClosed(); }
 
 private:
     /// Create socket of the given type.
@@ -1092,7 +1092,7 @@ public:
 
     std::ostream& stream(std::ostream& os) const override;
 
-    bool checkRemoval(std::chrono::steady_clock::time_point now) override;
+    bool checkRemoval(std::chrono::steady_clock::time_point now) noexcept override;
 
     /// Just trigger the async shutdown.
     void shutdown() override
@@ -1730,7 +1730,7 @@ private:
     Buffer _outBuffer;
 
     enum class WSState : uint8_t { HTTP, WS } _wsState;
-    static std::string toString(WSState t);
+    static std::string toString(WSState t) noexcept;
 
     /// True if we've received a Continue in response to an Expect: 100-continue
     bool _sentHTTPContinue;
