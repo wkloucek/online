@@ -4204,7 +4204,8 @@ private:
     {
         std::shared_ptr<SocketFactory> factory = std::make_shared<PrisonerSocketFactory>();
 #if !MOBILEAPP
-        auto socket = std::make_shared<LocalServerSocket>(*PrisonerPoll, factory);
+        auto socket = std::make_shared<LocalServerSocket>(
+                        std::chrono::steady_clock::now(), *PrisonerPoll, factory);
 
         const std::string location = socket->bind();
         if (!location.length())
@@ -4233,7 +4234,7 @@ private:
         constexpr int DEFAULT_MASTER_PORT_NUMBER = 9981;
         std::shared_ptr<ServerSocket> socket
             = ServerSocket::create(ServerSocket::Type::Public, DEFAULT_MASTER_PORT_NUMBER,
-                                   ClientPortProto, *PrisonerPoll, factory);
+                                   ClientPortProto, std::chrono::steady_clock::now(), *PrisonerPoll, factory);
 
         COOLWSD::prisonerServerSocketFD = socket->getFD();
         LOG_INF("Listening to prisoner connections on #" << COOLWSD::prisonerServerSocketFD);
@@ -4245,6 +4246,7 @@ private:
     std::shared_ptr<ServerSocket> findServerPort()
     {
         std::shared_ptr<SocketFactory> factory;
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
         if (ClientPortNumber <= 0)
         {
@@ -4261,7 +4263,7 @@ private:
             factory = std::make_shared<PlainSocketFactory>();
 
         std::shared_ptr<ServerSocket> socket = ServerSocket::create(
-            ClientListenAddr, ClientPortNumber, ClientPortProto, *WebServerPoll, factory);
+            ClientListenAddr, ClientPortNumber, ClientPortProto, now, *WebServerPoll, factory);
 
         const int firstPortNumber = ClientPortNumber;
         while (!socket &&
@@ -4276,7 +4278,7 @@ private:
             LOG_INF("Client port " << (ClientPortNumber - 1) << " is busy, trying "
                                    << ClientPortNumber);
             socket = ServerSocket::create(ClientListenAddr, ClientPortNumber, ClientPortProto,
-                                          *WebServerPoll, factory);
+                                          now, *WebServerPoll, factory);
         }
 
         if (!socket)
