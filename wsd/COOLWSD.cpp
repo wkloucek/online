@@ -922,8 +922,8 @@ std::shared_ptr<ChildProcess> getNewChild_Blocks(SocketPoll &destPoll, unsigned 
 class InotifySocket : public Socket
 {
 public:
-    InotifySocket():
-        Socket(inotify_init1(IN_NONBLOCK), Socket::Type::Unix)
+    InotifySocket(std::chrono::steady_clock::time_point creationTime):
+        Socket(inotify_init1(IN_NONBLOCK), Socket::Type::Unix, creationTime)
         , m_stopOnConfigChange(true)
     {
         if (getFD() == -1)
@@ -4575,7 +4575,7 @@ int COOLWSD::innerMain()
 
 #ifdef __linux__
     if (getConfigValue<bool>("stop_on_config_change", false)) {
-        std::shared_ptr<InotifySocket> inotifySocket = std::make_shared<InotifySocket>();
+        std::shared_ptr<InotifySocket> inotifySocket = std::make_shared<InotifySocket>(startStamp);
         mainWait.insertNewSocket(inotifySocket);
     }
 #endif

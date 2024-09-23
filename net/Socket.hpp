@@ -144,11 +144,13 @@ public:
 
     // NB. see other Socket::Socket by init below.
     Socket(Type type,
-           std::chrono::steady_clock::time_point /*creationTime*/ = std::chrono::steady_clock::now())
+           std::chrono::steady_clock::time_point creationTime = std::chrono::steady_clock::now())
         : _type(type)
         , _clientPort(0)
         , _fd(createSocket(type))
         , _open(_fd >= 0)
+        , _creationTime(creationTime)
+        , _lastSeenTime(_creationTime)
     {
         init();
     }
@@ -172,6 +174,7 @@ public:
     bool isClosed() const { return !_open; }
 
     Type type() const { return _type; }
+    bool isIPType() const { return Type::IPv4 == _type || Type::IPv6 == _type; }
     void setClientAddress(const std::string& address, unsigned int port=0) { _clientAddress = address; _clientPort=port; }
     const std::string& clientAddress() const { return _clientAddress; }
     unsigned int clientPort() const { return _clientPort; }
@@ -179,7 +182,22 @@ public:
     /// Returns the OS native socket fd.
     int getFD() const { return _fd; }
 
+    std::ostream& streamStats(std::ostream& os, const std::chrono::steady_clock::time_point &now) const;
+    std::string getStatsString(const std::chrono::steady_clock::time_point &now) const;
+
     virtual std::ostream& stream(std::ostream& os) const  { return streamImpl(os); }
+
+    /// Returns monotonic creation timestamp
+    std::chrono::steady_clock::time_point getCreationTime() const { return _creationTime; }
+    /// Returns monotonic timestamp of last received signal from remote
+    std::chrono::steady_clock::time_point getLastSeenTime() const { return _lastSeenTime; }
+
+    /// Sets monotonic timestamp of last received signal from remote
+    void setLastSeenTime(std::chrono::steady_clock::time_point now) { _lastSeenTime = now; }
+
+    /// Checks whether socket is due for forced removal, e.g. by internal timeout or small throughput. Method will shutdown connection and socket on forced removal.
+    /// Returns true in case of forced removal, caller shall stop processing
+    virtual bool checkRemoval(std::chrono::steady_clock::time_point /* now */) { return false; }
 
     /// Shutdown the socket.
     /// TODO: Support separate read/write shutdown.
@@ -373,11 +391,13 @@ protected:
     /// Construct based on an existing socket fd.
     /// Used by accept() only.
     Socket(const int fd, Type type,
-           std::chrono::steady_clock::time_point /*creationTime*/ = std::chrono::steady_clock::now())
+           std::chrono::steady_clock::time_point creationTime)
         : _type(type)
         , _clientPort(0)
         , _fd(fd)
         , _open(_fd >= 0)
+        , _creationTime(creationTime)
+        , _lastSeenTime(_creationTime)
     {
         init();
     }
@@ -429,6 +449,9 @@ private:
     const int _fd;
     /// True if this socket is open.
     bool _open;
+
+    const std::chrono::steady_clock::time_point _creationTime;
+    std::chrono::steady_clock::time_point _lastSeenTime;
 
     // If _ignoreInput is true no more input from this socket will be processed.
     bool _ignoreInput;
@@ -490,8 +513,9 @@ public:
     virtual int getPollEvents(std::chrono::steady_clock::time_point now,
                               int64_t &timeoutMaxMicroS) = 0;
 
-    /// Do we need to handle a timeout ?
-    virtual void checkTimeout(std::chrono::steady_clock::time_point /* now */) {}
+    /// Checks whether a timeout has occurred. Method will shutdown connection and socket on timeout.
+    /// Returns true in case of a timeout, caller shall stop processing
+    virtual bool checkTimeout(std::chrono::steady_clock::time_point /* now */) { return false; }
 
     /// Do some of the queued writing.
     virtual void performWrites(std::size_t capacity) = 0;
@@ -985,8 +1009,10 @@ public:
                  ReadType readType = ReadType::NormalRead,
                  std::chrono::steady_clock::time_point creationTime = std::chrono::steady_clock::now() ) :
         Socket(fd, type, creationTime),
+        _maxDuration( net::Config::get().MaxDuration ),
         _pollTimeout( net::Config::get().SocketPollTimeout ),
         _httpTimeout( net::Config::get().HTTPTimeout ),
+        _minBytesPerSec( net::Config::get().MinBytesPerSec ),
         _hostname(std::move(host)),
         _bytesSent(0),
         _bytesRecvd(0),
@@ -995,7 +1021,7 @@ public:
         _shutdownSignalled(false),
         _readType(readType),
         _inputProcessingEnabled(true),
-        _lastSeenHTTPHeader( creationTime )
+        _lastSeenHTTPHeader( std::chrono::steady_clock::now() )
     {
         LOG_TRC("StreamSocket ctor");
     }
@@ -1027,6 +1053,8 @@ public:
     const std::string& hostname() const { return _hostname; }
 
     std::ostream& stream(std::ostream& os) const override;
+
+    bool checkRemoval(std::chrono::steady_clock::time_point now) override;
 
     /// Just trigger the async shutdown.
     void shutdown() override
@@ -1369,10 +1397,10 @@ protected:
     {
         ASSERT_CORRECT_SOCKET_THREAD(this);
 
-        _socketHandler->checkTimeout(now);
-
         if (!events && _inBuffer.empty())
             return;
+
+        setLastSeenTime(now);
 
         bool closed = (events & (POLLHUP | POLLERR | POLLNVAL));
 
@@ -1655,8 +1683,10 @@ protected:
 #endif
 
 private:
+    const std::chrono::microseconds _maxDuration;
     const std::chrono::microseconds _pollTimeout;
     const std::chrono::microseconds _httpTimeout;
+    const double _minBytesPerSec;
 
     /// The hostname (or IP) of the peer we are connecting to.
     const std::string _hostname;

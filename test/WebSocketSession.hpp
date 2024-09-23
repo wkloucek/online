@@ -264,6 +264,18 @@ public:
             pollPtr->wakeup();
     }
 
+    template <std::size_t N> void sendMessage(const char (&msg)[N])
+    {
+        {
+            std::unique_lock<std::mutex> lock(_outMutex);
+            _outQueue.emplace_back(msg, msg + N - 1); // Minus the null-terminator.
+        }
+
+        const auto pollPtr = _socketPoll.lock();
+        if (pollPtr)
+            pollPtr->wakeup();
+    }
+
     /// Shutdown the WebSocket, either asynchronously or synchronously,
     /// depending on whether we have a SocketPoll or not.
     void shutdownWS()

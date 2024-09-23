@@ -98,6 +98,27 @@ int Socket::createSocket([[maybe_unused]] Socket::Type type)
 #endif
 }
 
+std::ostream& Socket::streamStats(std::ostream& os, const std::chrono::steady_clock::time_point &now) const
+{
+    const auto durTotal = std::chrono::duration_cast<std::chrono::milliseconds>(now - _creationTime);
+    const auto durLast = std::chrono::duration_cast<std::chrono::milliseconds>(now - _lastSeenTime);
+
+    const std::streamsize p = os.precision();
+    os.precision(1);
+    os << "Stats[dur[total "
+        << durTotal.count() << "ms, last "
+        << durLast.count() << " ms]]";
+    os.precision(p);
+    return os;
+}
+
+std::string Socket::getStatsString(const std::chrono::steady_clock::time_point &now) const
+{
+    std::ostringstream oss;
+    streamStats(oss, now);
+    return oss.str();
+}
+
 std::ostream& Socket::streamImpl(std::ostream& os) const
 {
     os << "Socket[#" << getFD()
@@ -593,6 +614,17 @@ int SocketPoll::poll(int64_t timeoutMaxMicroS)
                          << " of " << _pollSockets.size() << ") from " << _name);
                 _pollSockets[i] = nullptr;
             }
+            else if( _pollSockets[i]->checkRemoval(newNow) )
+            {
+                // timed out socket .. also checks
+                // ProtocolHandlerInterface
+                // - http::Session::checkTimeout() OK
+                // - WebSocketHandler::checkTimeout() OK
+                ++itemsErased;
+                LOGA_TRC(Socket, '#' << _pollFds[i].fd << ": Removing socket (at " << i
+                         << " of " << _pollSockets.size() << ") from " << _name);
+                _pollSockets[i] = nullptr;
+            }
             else if (_pollFds[i].fd == _pollSockets[i]->getFD())
             {
                 SocketDisposition disposition(_pollSockets[i]);
@@ -961,7 +993,8 @@ void WebSocketHandler::dumpState(std::ostream& os, const std::string& /*indent*/
 {
     os << (_shuttingDown ? "shutd " : "alive ");
 #if !MOBILEAPP
-    os << std::setw(5) << _pingTimeUs/1000. << "ms ";
+    os << std::setw(5) << _pingMicroS.last()/1000. << "ms, avg "
+       << _pingMicroS.average()/1000. << "ms ";
 #endif
     if (_wsPayload.size() > 0)
         Util::dumpHex(os, _wsPayload, "\t\tws queued payload:\n", "\t\t");
@@ -1367,6 +1400,59 @@ std::ostream& StreamSocket::stream(std::ostream& os) const
         os << clientAddress() << ":" << clientPort();
     }
     return os << "]";
+}
+
+bool StreamSocket::checkRemoval(std::chrono::steady_clock::time_point now)
+{
+    if (!isIPType()) // forced removal on IPv[46] network connections only
+    {
+        return false;
+    }
+    const auto durTotal =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - getCreationTime());
+    const auto durLast =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - getLastSeenTime());
+    const double bytesPerSecIn = durTotal.count() > 0 ? (double)_bytesRecvd / ((double)durTotal.count() / 1000.0) : (double)_bytesRecvd;
+    const bool c1 = now < getCreationTime();
+    const bool c2 = (_maxDuration > std::chrono::microseconds::zero() && durTotal > _maxDuration);
+    const bool c3 = (_pollTimeout > std::chrono::microseconds::zero() && durLast > _pollTimeout);
+    const bool c4 = (bytesPerSecIn > std::numeric_limits<double>::epsilon() &&
+                     _minBytesPerSec > 1.0f && bytesPerSecIn < _minBytesPerSec);
+    const bool c5 = SigUtil::getTerminationFlag();
+    if (c1 || c2 || c3 || c4 || c5)
+    {
+        LOG_WRN("CheckRemoval: Timeout: {c1 " << c1 << ", c2 " << c2 << ", c3 " << c3 << ", c4 " << c4 << ", c5 " << c5 << "}, "
+            << getStatsString(now) << ", "
+            << *this);
+        if (_socketHandler)
+        {
+            _socketHandler->onDisconnect();
+            if( isOpen() ) {
+                // FIXME: Ensure proper semantics of onDisconnect()
+                LOG_WRN("Socket still open post onDisconnect(), forced shutdown.");
+                shutdown(); // signal
+                closeConnection(); // real -> setClosed()
+                assert(isOpen() == false); // should have issued shutdown
+            }
+        }
+        else
+        {
+            shutdown(); // signal
+            closeConnection(); // real -> setClosed()
+            assert(isOpen() == false); // should have issued shutdown
+        }
+        return true;
+    }
+    else if (_socketHandler && _socketHandler->checkTimeout(now))
+    {
+        assert(isOpen() == false); // should have issued shutdown
+        setClosed();
+        LOG_WRN("CheckRemoval: Timeout: " << getStatsString(now) << ", " << *this);
+        return true;
+    } else {
+        LOG_DBG("CheckRemoval: Test " << getStatsString(now) << ", " << *this);
+    }
+    return false;
 }
 
 #if !MOBILEAPP
