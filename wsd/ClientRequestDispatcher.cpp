@@ -950,10 +950,19 @@ void ClientRequestDispatcher::handleIncomingMessage(SocketDisposition& dispositi
         socket->ignoreInput();
     }
     else
+    {
         LOG_DBG("Handled request: " << request.getURI()
                 << ", inBuf[sz " << preInBufferSz << " -> " << socket->getInBuffer().size()
                 << ", rm " <<  (preInBufferSz-socket->getInBuffer().size())
                 << "], connection open " << !socket->isClosed());
+
+        fprintf(stderr, "force an error here\n");
+        // http::Response httpResponse(http::StatusCode::BadRequest);
+        http::Response httpResponse(http::StatusCode::TooManyRequests);
+        httpResponse.set("Content-Length", "0");
+        socket->sendAndShutdown(httpResponse);
+        socket->ignoreInput();
+    }
 
 #else // !MOBILEAPP
     Poco::Net::HTTPRequest request;
