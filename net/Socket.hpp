@@ -35,6 +35,7 @@
 #include "Util.hpp"
 #include "Buffer.hpp"
 #include "SigUtil.hpp"
+#include "NetUtil.hpp"
 
 #include "FakeSocket.hpp"
 
@@ -655,8 +656,6 @@ public:
 
     static std::unique_ptr<Watchdog> PollWatchdog;
 
-    /// Default poll time - useful to increase for debugging.
-    static constexpr std::chrono::microseconds DefaultPollTimeoutMicroS = std::chrono::seconds(64);
     static std::atomic<bool> InhibitThreadChecks;
 
     /// Stop the polling thread.
@@ -881,7 +880,7 @@ private:
     {
         while (continuePolling())
         {
-            poll(DefaultPollTimeoutMicroS);
+            poll(_pollTimeout);
         }
     }
 
@@ -923,6 +922,7 @@ private:
 
     /// Debug name used for logging.
     const std::string _name;
+    const std::chrono::microseconds _pollTimeout;
 
     /// main-loop wakeup pipe
     int _wakeup[2];
@@ -978,6 +978,8 @@ public:
     StreamSocket(std::string host, const int fd, Type type, bool /* isClient */,
                  ReadType readType = ReadType::NormalRead) :
         Socket(fd, type),
+        _pollTimeout( net::Defaults::get().SocketPollTimeout ),
+        _httpTimeout( net::Defaults::get().HTTPTimeout ),
         _hostname(std::move(host)),
         _bytesSent(0),
         _bytesRecvd(0),
@@ -1648,6 +1650,11 @@ protected:
 #endif
 
 private:
+    /// default to 64s, see net::Defaults::SocketPollTimeout
+    const std::chrono::microseconds _pollTimeout;
+    /// defaults to 30s, see net::Defaults::HTTPTimeout
+    const std::chrono::microseconds _httpTimeout;
+
     /// The hostname (or IP) of the peer we are connecting to.
     const std::string _hostname;
 
@@ -1673,7 +1680,7 @@ private:
     ReadType _readType;
     std::atomic_bool _inputProcessingEnabled;
 
-    // Used in parseHeader, SocketPoll::DefaultPollTimeoutMicroS acting as max delay
+    // Used in parseHeader, net::Defaults::HTTPTimeout acting as max delay
     std::chrono::steady_clock::time_point _lastSeenHTTPHeader;
 };
 
