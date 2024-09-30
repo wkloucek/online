@@ -17,6 +17,11 @@ declare var _: any;
 declare var Autolinker: any;
 declare var Hammer: any;
 
+interface Window {
+	prefs: any;
+	getCaretCoordinates: (...args: any[]) => any;
+}
+
 namespace cool {
 
 /*
@@ -399,8 +404,55 @@ export class Comment extends CanvasSectionObject {
 		this.sectionProperties.resolvedTextElement.innerText = state === 'true' ? _('Resolved') : '';
 	}
 
-	private textAreaInput (): void {
+	getCurrentCursorPosition(): Point {
+		var clientRect = this.sectionProperties.nodeModifyText.getBoundingClientRect();
+		var caret = window.getCaretCoordinates(this.sectionProperties.nodeModifyText, this.sectionProperties.nodeModifyText.selectionEnd);
+		if (isNaN(caret.height)) // "e.g. normal"
+			caret.height = parseInt(window.getComputedStyle(this.sectionProperties.nodeModifyText).fontSize) * 1.2;
+
+		var mapRect = this.map._container.getBoundingClientRect();
+		return new L.Point(
+			clientRect.left + caret.left - mapRect.left,
+			clientRect.top + caret.top - mapRect.top + caret.height,
+		);
+	}
+
+	private handleMentionInput (ev: any, removeBefore: number): void {
+
+		var docLayer = this.sectionProperties.docLayer;
+		if (docLayer._typingMention)  {
+			if (removeBefore > 0) {
+				var ch = docLayer._mentionText.pop();
+				if (ch === '@') {
+					this.map.fire('closementionpopup', { 'typingMention': false });
+				} else {
+					this.map.fire('sendmentiontext', {data: docLayer._mentionText, cursor: this.getCurrentCursorPosition()});
+				}
+			} else if (removeBefore === 0) {
+				docLayer._mentionText.push(ev.data);
+				var regEx = /^[0-9a-zA-Z ]+$/;
+				if (ev.data && ev.data.match(regEx)) {
+					this.map.fire('sendmentiontext', {data: docLayer._mentionText, cursor: this.getCurrentCursorPosition()});
+				} else {
+					this.map.fire('closementionpopup', { 'typingMention': false });
+				}
+			}
+		}
+
+		if (ev.data === '@' && this.map.getDocType() === 'text') {
+			docLayer._mentionText.push(ev.data);
+			docLayer._typingMention = true;
+		}
+	}
+
+	private textAreaInput (ev: any): void {
 		this.sectionProperties.autoSave.innerText = '';
+
+		if (ev && this.sectionProperties.docLayer._docType === 'text') {
+			// special handling for mentions
+			// this.handleMentionInput(e, removeBefore);
+			this.handleMentionInput(ev, 0);
+		}
 	}
 
 	private updateContent (): void {
@@ -940,7 +992,7 @@ export class Comment extends CanvasSectionObject {
 	public handleReplyCommentButton (e: any): void {
 		cool.CommentSection.autoSavedComment = null;
 		cool.CommentSection.commentWasAutoAdded = false;
-		this.textAreaInput();
+		this.textAreaInput(null);
 		this.onReplyClick(e);
 	}
 
@@ -1005,7 +1057,7 @@ export class Comment extends CanvasSectionObject {
 		cool.CommentSection.autoSavedComment = null;
 		cool.CommentSection.commentWasAutoAdded = false;
 		this.sectionProperties.contentText.unedited = null;
-		this.textAreaInput();
+		this.textAreaInput(null);
 		this.onSaveComment(e);
 	}
 
