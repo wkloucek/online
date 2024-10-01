@@ -17,11 +17,6 @@ declare var _: any;
 declare var Autolinker: any;
 declare var Hammer: any;
 
-interface Window {
-	prefs: any;
-	getCaretCoordinates: (...args: any[]) => any;
-}
-
 namespace cool {
 
 /*
