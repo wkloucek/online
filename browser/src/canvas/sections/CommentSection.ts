@@ -409,18 +409,12 @@ export class Comment extends CanvasSectionObject {
 	}
 
 	getCurrentCursorPosition(isReplyNode: boolean): Point {
-		let targetTextArea = this.sectionProperties.nodeModifyText;
-		if (isReplyNode)
-				targetTextArea = this.sectionProperties.nodeReplyText;
-		var clientRect = targetTextArea.getBoundingClientRect();
-		var caret = window.getCaretCoordinates(targetTextArea, targetTextArea.selectionEnd);
-		if (isNaN(caret.height)) // "e.g. normal"
-			caret.height = parseInt(window.getComputedStyle(targetTextArea).fontSize) * 1.2;
+		const caretRect = window.getSelection().getRangeAt(0).getBoundingClientRect();
 
 		var mapRect = this.map._container.getBoundingClientRect();
 		return new L.Point(
-			clientRect.left + caret.left - mapRect.left,
-			clientRect.top + caret.top - mapRect.top + caret.height,
+			caretRect.left - mapRect.left,
+			caretRect.bottom - mapRect.top,
 		);
 	}
 
