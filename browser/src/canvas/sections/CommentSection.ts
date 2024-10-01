@@ -1575,7 +1575,7 @@ export class Comment extends CanvasSectionObject {
 
 	// TODO: use profileLink parameter to create hyperlink html element inside comment textarea
 	// TODO: fix not work with replyNode for now
-	public autoCompleteMention(username: string, profileLink: string, replacement: string) {
+	public autoCompleteMention(username: string, profileLink: string, replacement: string): void {
 		let currentText: string = this.sectionProperties.nodeModifyText.value
 		const cursorPosition = this.sectionProperties.nodeModifyText.selectionStart;
 		const mentionStart = currentText.lastIndexOf(replacement, cursorPosition);
