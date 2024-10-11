@@ -390,9 +390,11 @@ private:
 #if ENABLE_DEBUG
             if (std::getenv("COOL_ZERO_BUFFER_SIZE"))
             {
+#if !MOBILEAPP
                 const int oldSize = getSocketBufferSize();
                 setSocketBufferSize(0);
                 LOG_TRC("Buffer size: " << getSendBufferSize() << " (was " << oldSize << ')');
+#endif
             }
 #endif
         }

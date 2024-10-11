@@ -501,7 +501,11 @@ connect(const std::string& host, const std::string& port, const bool isSSL,
                 else
                 {
                     Socket::Type type = ai->ai_family == AF_INET ? Socket::Type::IPv4 : Socket::Type::IPv6;
+#if !MOBILEAPP
                     HostType hostType = hostEntry.isLocalhost() ? HostType::LocalHost : HostType::Other;
+#else
+                    HostType hostType = HostType::LocalHost;
+#endif
 #if ENABLE_SSL
                     if (isSSL)
                     {
