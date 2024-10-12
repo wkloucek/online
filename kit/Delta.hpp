@@ -41,10 +41,11 @@ struct TileLocation {
     int _size;
     int _part;
     int _canonicalViewId;
+    int _viewMode;
     TileLocation(int left, int top, int size, int part,
-                 int canonicalViewId)
+                 int canonicalViewId, int viewMode)
         : _left(left), _top(top), _size(size), _part(part),
-          _canonicalViewId(canonicalViewId)
+          _canonicalViewId(canonicalViewId), _viewMode(viewMode)
     {
     }
     size_t hash() const
@@ -61,7 +62,8 @@ struct TileLocation {
     {
         return _left == other._left && _top == other._top &&
                _size == other._size && _part == other._part &&
-               _canonicalViewId == other._canonicalViewId;
+               _canonicalViewId == other._canonicalViewId &&
+               _viewMode == other._viewMode;
     }
 };
 
@@ -362,7 +364,7 @@ class DeltaGenerator {
 
         DeltaData(TileWireId wid, unsigned char* pixmap, size_t startX, size_t startY, int width,
                   int height, const TileLocation& loc, int bufferWidth,
-                  [[maybe_unused]] int bufferHeight)
+                  [[maybe_unused]] int bufferHeight, int viewMode)
             : _loc(loc)
             , _inUse(false)
             , _wid(wid)
@@ -370,6 +372,7 @@ class DeltaGenerator {
             // in Pixels
             _width(width)
             , _height(height)
+            , _viewMode(viewMode)
             , _rows(new DeltaBitmapRow[height])
         {
             assert (startX + width <= (size_t)bufferWidth);
@@ -422,6 +425,16 @@ class DeltaGenerator {
             return _height;
         }
 
+        void setViewMode(int viewMode)
+        {
+            _viewMode = viewMode;
+        }
+
+        int getViewMode()
+        {
+            return _viewMode;
+        }
+
         const DeltaBitmapRow& getRow(int y) const
         {
             return _rows[y];
@@ -446,6 +459,7 @@ class DeltaGenerator {
             _wid = repl->_wid;
             _width = repl->_width;
             _height = repl->_height;
+            _viewMode = repl->_viewMode;
             delete[] _rows;
             _rows = repl->_rows;
             repl->_rows = nullptr;
@@ -470,6 +484,7 @@ class DeltaGenerator {
         TileWireId _wid;
         int _width;
         int _height;
+        int _viewMode;
         DeltaBitmapRow *_rows;
     };
 
@@ -720,7 +735,7 @@ class DeltaGenerator {
         // as we make the delta into an existing cache entry,
         // and just do this as/when there is no entry.
         std::shared_ptr<DeltaData> update(std::make_shared<DeltaData>(
-            wid, pixmap, startX, startY, width, height, loc, bufferWidth, bufferHeight));
+            wid, pixmap, startX, startY, width, height, loc, bufferWidth, bufferHeight, loc._viewMode));
         std::shared_ptr<DeltaData> cacheEntry;
 
         {

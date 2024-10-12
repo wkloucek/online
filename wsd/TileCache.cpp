@@ -442,6 +442,8 @@ bool TileCache::subscribeToTileRendering(const TileDesc& tile, const std::shared
 
     std::shared_ptr<TileBeingRendered> tileBeingRendered = findTileBeingRendered(tile);
 
+    std::cout << "Tile mode: " << tile.getEditMode() << " id: " << tile.getId() << std::endl;
+
     if (tileBeingRendered)
     {
         if (tileBeingRendered->isStale(&now))

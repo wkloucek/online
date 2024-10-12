@@ -106,6 +106,7 @@ public:
     int getTileWidth() const { return _tileWidth; }
     int getTileHeight() const { return _tileHeight; }
     int getVersion() const { return _ver; }
+    int getId() const { return _id; }
     void setVersion(const int ver) { _ver = ver; }
     int getImgSize() const { return _imgSize; }
     void setImgSize(const int imgSize) { _imgSize = imgSize; }

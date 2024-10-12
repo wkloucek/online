@@ -241,11 +241,13 @@ L.Map.include({
 		}
 
 		if (fetchThumbnail) {
-			var mode = docLayer._selectedMode;
+			let mode = docLayer._selectedMode ? docLayer._selectedMode : 0;
+			mode = ((docLayer._docType === 'presentation' && mode === 2) ? 0 : mode);
+
 			this._addPreviewToQueue(part, 'tile ' +
 							'nviewid=0' + ' ' +
 							'part=' + part + ' ' +
-							((mode !== 0) ? ('mode=' + mode + ' ') : '') +
+							'mode=' + mode + ' ' +
 							'width=' + maxWidth * app.roundedDpiScale + ' ' +
 							'height=' + maxHeight * app.roundedDpiScale + ' ' +
 							'tileposx=' + tilePosX + ' ' +

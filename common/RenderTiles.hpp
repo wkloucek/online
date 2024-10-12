@@ -120,6 +120,9 @@ namespace RenderTiles
         const double area = pixmapWidth * pixmapHeight;
         const auto start = std::chrono::steady_clock::now();
         LOG_TRC("Calling paintPartTile(" << (void*)pixmap.data() << ')');
+
+        std::cout << "Rendering in mode: " << tileCombined.getEditMode() << std::endl;
+
         document->paintPartTile(pixmap.data(),
                                 tileCombined.getPart(),
                                 tileCombined.getEditMode(),
@@ -196,7 +199,8 @@ namespace RenderTiles
                                                          tileRect.getTop(),
                                                          tileRect.getWidth(),
                                                          tileCombined.getPart(),
-                                                         canonicalViewId
+                                                         canonicalViewId,
+                                                         tileCombined.getEditMode()
                                                          ),
                                                      data, wireId, forceKeyframe, dumpTiles, mode);
                         }
