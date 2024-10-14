@@ -92,16 +92,15 @@
               const type = msg.Values.type;
               const text = msg.Values.text;
 
-              const userData = getMentionUserData();
-
-              let filteredUser = [];
-              userData.forEach(element => {
-                if (element.username.toLowerCase().includes(text.toLowerCase()))
-                  filteredUser.push(element);
-              });
-
               if (type === 'autocomplete')
               {
+                const userData = getMentionUserData();
+
+                let filteredUser = [];
+                userData.forEach(element => {
+                  if (element.username.toLowerCase().includes(text.toLowerCase()))
+                    filteredUser.push(element);
+                });
                 setTimeout(post, 0,
                   {
                     'MessageId': 'Action_Mention',
