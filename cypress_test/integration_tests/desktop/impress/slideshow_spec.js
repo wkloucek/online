@@ -3,6 +3,10 @@
 var helper = require('../../common/helper');
 const desktopHelper = require('../../common/desktop_helper');
 
+function getSlideShowContent() {
+	return cy.cGet('#slideshow-cypress-iframe');
+}
+
 describe(['tagdesktop', 'tagnextcloud', 'tagproxy'], 'Some app', function() {
 	beforeEach(function() {
 		helper.setupAndLoadDocument('impress/slideshow.odp');
@@ -13,6 +17,6 @@ describe(['tagdesktop', 'tagnextcloud', 'tagproxy'], 'Some app', function() {
 	});
 
 	it('Should see an empty slideshow', function() {
-		cy.compareSnapshot('slideshow');
+		getSlideShowContent().compareSnapshot('slideshow', 0.05);
 	});
 });

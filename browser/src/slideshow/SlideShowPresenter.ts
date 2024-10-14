@@ -122,8 +122,11 @@ class SlideShowPresenter {
 	private _metaPresentation: MetaPresentation;
 	private _startSlide: number;
 	private _presentationInfoChanged: boolean = false;
+	private _cypressSVGPresentationTest: boolean = false;
 
 	constructor(map: any) {
+		this._cypressSVGPresentationTest =
+			L.Browser.cypressTest || 'Cypress' in window;
 		this._map = map;
 		this._init();
 		this.addHooks();
@@ -173,7 +176,7 @@ class SlideShowPresenter {
 	}
 
 	public isFullscreen() {
-		return !!this._fullscreen;
+		return !!this._fullscreen || !this._cypressSVGPresentationTest;
 	}
 
 	public getCanvas(): HTMLCanvasElement {
@@ -530,7 +533,13 @@ class SlideShowPresenter {
 			_('Windowed Presentation: ') + this._map['wopi'].BaseFileName;
 		const htmlContent = this._generateSlideWindowHtml(popupTitle);
 
-		this._slideShowWindowProxy = window.open('', '_blank', 'popup');
+		this._slideShowWindowProxy = this._cypressSVGPresentationTest
+			? L.DomUtil.createWithId(
+					'iframe',
+					'slideshow-cypress-iframe',
+					document.querySelector('#map'),
+				)
+			: window.open('', '_blank', 'popup');
 
 		if (!this._slideShowWindowProxy) {
 			this._map.uiManager.showInfoModal(
