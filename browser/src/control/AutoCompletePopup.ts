@@ -67,7 +67,8 @@ abstract class AutoCompletePopup {
 	abstract onAdd(): void;
 
 	closePopup(): void {
-		var popupExists = L.DomUtil.get(this.popupId + 'List');
+		var popupExists =
+			L.DomUtil.get(this.popupId) || L.DomUtil.get(this.popupId + 'List');
 		if (!popupExists) return;
 
 		this.map.jsdialog.focusToLastElement(this.popupId);
